@@ -1,10 +1,8 @@
-from py.log import Producer
-
-from xdist.slavemanage import parse_spec_config
+from xdist.scheduler.base_scheduler import Scheduling
 from xdist.report import report_collection_diff
 
 
-class EachScheduling:
+class EachScheduling(Scheduling):
     """Implement scheduling of test items on all nodes
 
     If a node gets added after the test run is started then it is
@@ -17,18 +15,15 @@ class EachScheduling:
     finished all its pending items.  The new node will then be
     assigned the remaining items from the removed node.
     """
+    LOGGER_NAME = 'eachsched'
 
     def __init__(self, config, log=None):
-        self.config = config
-        self.numnodes = len(parse_spec_config(config))
+        Scheduling.__init__(self, config, log)
+
         self.node2collection = {}
         self.node2pending = {}
         self._started = []
         self._removed2pending = {}
-        if log is None:
-            self.log = Producer("eachsched")
-        else:
-            self.log = log.eachsched
         self.collection_is_completed = False
 
     @property

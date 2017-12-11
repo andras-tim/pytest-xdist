@@ -1,13 +1,12 @@
 from itertools import cycle
 
-from py.log import Producer
 from _pytest.runner import CollectReport
 
-from xdist.slavemanage import parse_spec_config
+from xdist.scheduler.base_scheduler import Scheduling
 from xdist.report import report_collection_diff
 
 
-class LoadScheduling:
+class LoadScheduling(Scheduling):
     """Implement load scheduling across nodes.
 
     This distributes the tests collected across all nodes so each test
@@ -52,18 +51,15 @@ class LoadScheduling:
 
     :config: Config object, used for handling hooks.
     """
+    LOGGER_NAME = 'loadsched'
 
     def __init__(self, config, log=None):
-        self.numnodes = len(parse_spec_config(config))
+        Scheduling.__init__(self, config, log)
+
         self.node2collection = {}
         self.node2pending = {}
         self.pending = []
         self.collection = None
-        if log is None:
-            self.log = Producer("loadsched")
-        else:
-            self.log = log.loadsched
-        self.config = config
 
     @property
     def nodes(self):

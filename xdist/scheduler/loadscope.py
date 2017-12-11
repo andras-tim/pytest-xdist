@@ -4,14 +4,13 @@ except ImportError:
     # Support for Python 2.6
     from ordereddict import OrderedDict
 
-from py.log import Producer
 from _pytest.runner import CollectReport
 
-from xdist.slavemanage import parse_spec_config
+from xdist.scheduler.base_scheduler import Scheduling
 from xdist.report import report_collection_diff
 
 
-class LoadScopeScheduling:
+class LoadScopeScheduling(Scheduling):
     """Implement load scheduling across nodes, but grouping test by scope.
 
     This distributes the tests collected across all nodes so each test is run
@@ -88,21 +87,16 @@ class LoadScopeScheduling:
 
     :config: Config object, used for handling hooks.
     """
+    LOGGER_NAME = 'loadscopesched'
 
     def __init__(self, config, log=None):
-        self.numnodes = len(parse_spec_config(config))
+        Scheduling.__init__(self, config, log)
+
         self.collection = None
 
         self.workqueue = OrderedDict()
         self.assigned_work = OrderedDict()
         self.registered_collections = OrderedDict()
-
-        if log is None:
-            self.log = Producer('loadscopesched')
-        else:
-            self.log = log.loadscopesched
-
-        self.config = config
 
     @property
     def nodes(self):
