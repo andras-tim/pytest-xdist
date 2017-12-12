@@ -88,7 +88,21 @@ class SlaveInteractor:
         self.sendevent(
             "collectionfinish",
             topdir=str(session.fspath),
-            ids=[item.nodeid for item in session.items])
+            ids=['{prefix}{nodeid}'.format(prefix=self._get_nodeid_prefix(item), nodeid=item.nodeid)
+                 for item in session.items])
+
+    def _get_nodeid_prefix(self, item):
+        if self.config.known_args_namespace.dist == 'fixture':
+            group = self._get_group(item, self.config.getini('dist_fixture_prefix'))
+            return '{}::'.format(group)
+        return ''
+
+    def _get_group(self, item, fixture_prefix):
+        return ':'.join(sorted([
+            fixture
+            for fixture in item.fixturenames
+            if fixture.startswith(fixture_prefix)
+        ]))
 
     def pytest_runtest_logstart(self, nodeid, location):
         self.sendevent("logstart", nodeid=nodeid, location=location)

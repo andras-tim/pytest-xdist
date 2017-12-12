@@ -31,7 +31,7 @@ def pytest_addoption(parser):
                          "when crashed (set to zero to disable this feature)")
     group.addoption(
         '--dist', metavar="distmode",
-        action="store", choices=['each', 'load', 'loadscope', 'no'],
+        action="store", choices=['each', 'load', 'loadscope', 'fixture', 'no'],
         dest="dist", default="no",
         help=("set mode for distributing tests to exec environments.\n\n"
               "each: send each test to all available environments.\n\n"
@@ -39,6 +39,8 @@ def pytest_addoption(parser):
               " available environment.\n\n"
               "loadscope: load balance by sending pending groups of tests in"
               " the same scope to any available environment.\n\n"
+              "fixture: load balance by groups based on fixtures; you can filter"
+              " fixtures by dist_fixture_prefix ini option.\n\n"
               "(default) no: run tests inprocess, don't distribute."))
     group.addoption(
         '--tx', dest="tx", action="append", default=[],
@@ -69,6 +71,9 @@ def pytest_addoption(parser):
     parser.addini(
         "looponfailroots", type="pathlist",
         help="directories to check for changes", default=[py.path.local()])
+    parser.addini(
+        'dist_fixture_prefix',
+        help='specify fixture prefix for --dist=fixture (default=config_)', default='config_')
 
 
 # -------------------------------------------------------------------------
