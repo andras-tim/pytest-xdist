@@ -11,8 +11,10 @@ class FixtureScheduling(LoadScheduling):
 
         pending_groups = self._get_groups(pending_indexed_tests)
         group = self._get_node_group(node)
-        if not group or group not in pending_groups:
+
+        if group is None or group not in pending_groups:
             group = self._calculate_new_group_for_node(pending_groups)
+            self.log("{}: new fixture group: '{}'".format(node, group))
             node.scheduler_group = group
 
         indices = self._filter_indices_by_group(pending_indexed_tests, group)[:num]
