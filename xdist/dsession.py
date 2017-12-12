@@ -6,6 +6,7 @@ from xdist.scheduler import (
     EachScheduling,
     LoadScheduling,
     LoadScopeScheduling,
+    FixtureScheduling,
 )
 
 
@@ -99,6 +100,7 @@ class DSession:
             'each': EachScheduling,
             'load': LoadScheduling,
             'loadscope': LoadScopeScheduling,
+            'fixture': FixtureScheduling,
         }
         return schedulers[dist](config, log)
 
