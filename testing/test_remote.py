@@ -274,6 +274,26 @@ class TestSlaveInteractor:
         ev = slave.popevent("slavefinished")
         assert 'slaveoutput' in ev.kwargs
 
+    def test_basic_collect_and_runtests2(self, slave):
+        from xdist.plugin import pytest_cmdline_main as check_options
+        slave.testdir.makepyfile("""
+            def test_func():
+                pass
+        """)
+        slave.setup()
+        check_options('--dist=fixture')
+        ev = slave.popevent()
+        assert ev.name == "slaveready"
+        ev = slave.popevent()
+        assert ev.name == "collectionstart"
+        assert not ev.kwargs
+        ev = slave.popevent("collectionfinish")
+        assert ev.kwargs['topdir'] == slave.testdir.tmpdir
+        ids = ev.kwargs['ids']
+        assert ids == [
+            '::test_basic_collect_and_runtests2.py::test_func'
+        ]
+
     @pytest.mark.skipif(pytest.__version__ >= '3.0',
                         reason='skip at module level illegal in pytest 3.0')
     def test_remote_collect_skip(self, slave):

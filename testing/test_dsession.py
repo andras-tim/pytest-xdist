@@ -3,6 +3,7 @@ from xdist.report import report_collection_diff
 from xdist.scheduler import (
     EachScheduling,
     LoadScheduling,
+    FixtureScheduling,
 )
 
 import py
@@ -28,7 +29,8 @@ class MockGateway:
 
 
 class MockNode:
-    def __init__(self):
+    def __init__(self, gw_id=None):
+        self.gw_id = gw_id if gw_id is not None else repr(self)
         self.sent = []
         self.gateway = MockGateway()
         self._shutdown = False
@@ -45,6 +47,9 @@ class MockNode:
     @property
     def shutting_down(self):
         return self._shutdown
+
+    def __str__(self):
+        return self.gw_id
 
 
 def dumpqueue(queue):
@@ -231,6 +236,201 @@ class TestLoadScheduling:
         assert len(collect_hook.reports) == 1
         rep = collect_hook.reports[0]
         assert 'Different tests were collected between' in rep.longrepr
+
+
+class TestFixtureScheduling:
+    def test_schedule_load_simple(self, testdir):
+        config = testdir.parseconfig("--tx=2*popen")
+        sched = FixtureScheduling(config)
+        sched.add_node(MockNode('gw0'))
+        sched.add_node(MockNode('gw1'))
+        node1, node2 = sched.nodes
+        collection = [
+            "::a.py::test_0",
+            "config_a::a.py::test_1",
+        ]
+
+        assert not sched.collection_is_completed
+        sched.add_node_collection(node1, collection)
+        assert not sched.collection_is_completed
+        sched.add_node_collection(node2, collection)
+        assert sched.collection_is_completed
+        assert sched.node2collection[node1] == collection
+        assert sched.node2collection[node2] == collection
+
+        sched.schedule()
+        assert not sched.pending
+        assert sched.tests_finished
+        assert node1.scheduler_group == ''
+        assert node1.sent == [0]
+        assert node2.scheduler_group == 'config_a'
+        assert node2.sent == [1]
+
+        assert sched.tests_finished
+
+    def test_schedule_load_simple2(self, testdir):
+        config = testdir.parseconfig("--tx=2*popen")
+        sched = FixtureScheduling(config)
+        sched.add_node(MockNode('gw0'))
+        sched.add_node(MockNode('gw1'))
+        node1, node2 = sched.nodes
+        collection = [
+            "::a.py::test_0",
+            "::a.py::test_1",
+            "config_a::a.py::test_2",
+        ]
+
+        assert not sched.collection_is_completed
+        sched.add_node_collection(node1, collection)
+        assert not sched.collection_is_completed
+        sched.add_node_collection(node2, collection)
+        assert sched.collection_is_completed
+        assert sched.node2collection[node1] == collection
+        assert sched.node2collection[node2] == collection
+
+        sched.schedule()
+        assert not sched.pending
+        assert not sched.tests_finished
+        assert node1.scheduler_group == ''
+        assert node1.sent == [0, 1]
+        assert node2.scheduler_group == 'config_a'
+        assert node2.sent == [2]
+
+        sched.mark_test_complete(node1, 0)
+        assert sched.tests_finished
+
+    def test_schedule_load_simple3(self, testdir):
+        config = testdir.parseconfig("--tx=2*popen")
+        sched = FixtureScheduling(config)
+        sched.add_node(MockNode('gw0'))
+        sched.add_node(MockNode('gw1'))
+        node1, node2 = sched.nodes
+        collection = [
+            "::a.py::test_0",
+            "::a.py::test_1",
+            "config_a::a.py::test_2",
+            "config_a::a.py::test_3",
+        ]
+
+        assert not sched.collection_is_completed
+        sched.add_node_collection(node1, collection)
+        assert not sched.collection_is_completed
+        sched.add_node_collection(node2, collection)
+        assert sched.collection_is_completed
+        assert sched.node2collection[node1] == collection
+        assert sched.node2collection[node2] == collection
+
+        sched.schedule()
+        assert not sched.pending
+        assert not sched.tests_finished
+        assert node1.scheduler_group == ''
+        assert node1.sent == [0, 1]
+        assert node2.scheduler_group == 'config_a'
+        assert node2.sent == [2, 3]
+
+        sched.mark_test_complete(node1, 0)
+        assert not sched.tests_finished
+
+        sched.mark_test_complete(node2, 2)
+        assert sched.tests_finished
+
+    def test_schedule_load_simpleX(self, testdir):
+        config = testdir.parseconfig("--tx=2*popen")
+        sched = FixtureScheduling(config)
+        sched.add_node(MockNode('gw0'))
+        sched.add_node(MockNode('gw1'))
+        node1, node2 = sched.nodes
+        collection = [
+            "::a.py::test_0",
+            "::a.py::test_1",
+            "config_a::a.py::test_2",
+            "config_a::a.py::test_3",
+            "config_a::a.py::test_4",
+        ]
+
+        assert not sched.collection_is_completed
+        sched.add_node_collection(node1, collection)
+        assert not sched.collection_is_completed
+        sched.add_node_collection(node2, collection)
+        assert sched.collection_is_completed
+        assert sched.node2collection[node1] == collection
+        assert sched.node2collection[node2] == collection
+
+        sched.schedule()
+        assert sched.pending
+        assert not sched.tests_finished
+        assert node1.scheduler_group == ''
+        assert node1.sent == [0, 1]
+        assert node2.scheduler_group == 'config_a'
+        assert node2.sent == [2, 3]
+
+        sched.mark_test_complete(node1, 0)
+        assert not sched.tests_finished
+
+        sched.schedule()
+        assert not sched.pending
+        assert not sched.tests_finished
+        assert node1.scheduler_group == 'config_a'
+        assert node1.sent == [0, 1, 4]
+        assert node2.scheduler_group == 'config_a'
+        assert node2.sent == [2, 3]
+
+        sched.mark_test_complete(node2, 2)
+        sched.mark_test_complete(node1, 1)
+        assert sched.tests_finished
+
+    def test_schedule_load_simple4(self, testdir):
+        config = testdir.parseconfig("--tx=2*popen")
+        sched = FixtureScheduling(config)
+        sched.add_node(MockNode('gw0'))
+        sched.add_node(MockNode('gw1'))
+        node1, node2 = sched.nodes
+        collection = [
+            "::a.py::test_0",
+            "::a.py::test_1",
+            "config_a::a.py::test_2",
+            "config_a::a.py::test_3",
+            "config_a::a.py::test_4",
+            "config_b::a.py::test_5",
+        ]
+
+        assert not sched.collection_is_completed
+        sched.add_node_collection(node1, collection)
+        assert not sched.collection_is_completed
+        sched.add_node_collection(node2, collection)
+        assert sched.collection_is_completed
+        assert sched.node2collection[node1] == collection
+        assert sched.node2collection[node2] == collection
+
+        sched.schedule()
+        assert sched.pending
+        assert not sched.tests_finished
+        assert node1.scheduler_group == ''
+        assert node1.sent == [0, 1]
+        assert node2.scheduler_group == 'config_a'
+        assert node2.sent == [2, 3]
+
+        sched.mark_test_complete(node1, 0)
+        sched.schedule()
+        assert sched.pending
+        assert not sched.tests_finished
+        assert node1.scheduler_group == 'config_b'
+        assert node1.sent == [0, 1, 5]
+        assert node2.scheduler_group == 'config_a'
+        assert node2.sent == [2, 3]
+
+        sched.mark_test_complete(node1, 1)
+        sched.schedule()
+        assert not sched.pending
+        assert not sched.tests_finished
+        assert node1.scheduler_group == 'config_a'
+        assert node1.sent == [0, 1, 5, 4]
+        assert node2.scheduler_group == 'config_a'
+        assert node2.sent == [2, 3]
+
+        sched.mark_test_complete(node1, 5)
+        sched.mark_test_complete(node2, 3)
+        assert sched.tests_finished
 
 
 class TestDistReporter:
