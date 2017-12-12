@@ -30,3 +30,5 @@ pytestdebug.log
 .tox/
 .cache/
 .eggs/
+
+venv/
